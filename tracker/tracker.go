@@ -2,7 +2,6 @@ package tracker
 
 import (
     "net/url"
-    "log"
 )
 
 type Announce struct {
@@ -51,7 +50,7 @@ func NewAnnounce(data url.Values) *Announce {
     announce.Event = data.Get("event")
     announce.Data = data
 
-    return &announce
+    return announce
 }
 
 

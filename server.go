@@ -3,7 +3,7 @@ package main
 import (
     "net/http"
     "log"
-    "go-tracker/tracker"
+    "github.com/bpina/go-tracker/tracker"
 )
 
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
