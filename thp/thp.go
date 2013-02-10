@@ -1,4 +1,4 @@
-package tracker
+package thp
 
 import (
     "net/url"

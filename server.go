@@ -3,22 +3,22 @@ package main
 import (
     "net/http"
     "log"
-    "github.com/bpina/go-tracker/tracker"
+    "github.com/bpina/go-tracker/thp"
     "github.com/bpina/go-tracker/tools"
 )
 
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
     if req.Method == "POST" {
-        response := tracker.NewErrorResponse("Unsupported HTTP method.")
+        response := thp.NewErrorResponse("Unsupported HTTP method.")
         w.Write([]byte(response.String()))
         return
     }
 
     req.ParseForm()
-    announce, err := tracker.NewAnnounce(req.Form)
+    announce, err := thp.NewAnnounce(req.Form)
     if err != nil {
         message := tools.FormatErrors(err)
-        response := tracker.NewErrorResponse(message)
+        response := thp.NewErrorResponse(message)
         w.Write([]byte(response.String()))
         return
     } else {
