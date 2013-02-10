@@ -53,4 +53,10 @@ func NewAnnounce(data url.Values) *Announce {
     return announce
 }
 
+type Response struct {
+    FailureReason string
+}
 
+func NewErrorResponse(message string) *Response {
+    return &Response{message}
+}

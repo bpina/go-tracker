@@ -8,7 +8,7 @@ import (
 
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
     if req.Method == "POST" {
-        return tracker.NewErrorResponse("Unsupported")
+        tracker.NewErrorResponse("Unsupported")
     }
 
     req.ParseForm()
