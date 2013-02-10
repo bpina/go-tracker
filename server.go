@@ -22,7 +22,19 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
         w.Write([]byte(response.String()))
         return
     } else {
-       announce.NumWant = 5
+        response := new(thp.Response)
+        response.Interval = 30
+        response.Complete = 999
+        response.Incomplete = 999
+
+        peer := new(thp.ConnectedPeer)
+        peer.Ip = "192.168.3.99"
+        peer.Port = 1337
+        peer.PeerId = announce.PeerId
+
+        response.Peers = append(response.Peers, *peer)
+
+        w.Write([]byte(response.String()))
        return
     }
 }
