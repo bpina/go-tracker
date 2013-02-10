@@ -4,5 +4,6 @@
 <h2>Installatoin</h2>
 <pre>
 go get github.com/bpina/go-tracker
+go install github.com/bpina/go-tracker
 </pre>
 
