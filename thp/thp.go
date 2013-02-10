@@ -79,7 +79,7 @@ func GetAnnounceErrors(data url.Values) []string {
     eventMatch := false
     event := data.Get("event")
     if event != "" {
-        for _, x := range &[...]string{"", "start", "stopped", "completed"} {
+        for _, x := range &[...]string{"", "started", "stopped", "completed"} {
                 if event == x {
                 eventMatch = true
                 break

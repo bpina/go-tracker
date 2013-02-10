@@ -3,7 +3,10 @@
 
 <h2>Installation</h2>
 <pre>
-go get github.com/bpina/go-tracker
-go install github.com/bpina/go-tracker
+git clone https://github.com/bpina/go-tracker.git
+</pre>
+<p>Edit the value for PREFIX in the makefile to your liking</p>
+<pre>
+make install
 </pre>
 

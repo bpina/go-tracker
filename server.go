@@ -1,5 +1,7 @@
 package main
 
+
+
 import (
     "net/http"
     "log"
@@ -8,6 +10,9 @@ import (
 )
 
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
+    log.Printf(req.URL.RawQuery)
+    w.Header().Set("Content-Type", "text/plain")
+
     if req.Method == "POST" {
         response := thp.NewErrorResponse("Unsupported HTTP method.")
         w.Write([]byte(response.String()))
@@ -34,7 +39,9 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
 
         response.Peers = append(response.Peers, *peer)
 
-        w.Write([]byte(response.String()))
+        message := response.String()
+        log.Printf(message)
+        w.Write([]byte(message))
        return
     }
 }
