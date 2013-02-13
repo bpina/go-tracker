@@ -15,6 +15,7 @@ type Announce struct {
     Downloaded      int
     Left            int
     Ip              string
+    IpV6            string
     NumWant         int
     Event           string
 
@@ -111,6 +112,7 @@ func NewAnnounce(data url.Values) (*Announce, []string) {
     announce.Uploaded = tools.IntOrDefault(data.Get("uploaded"))
     announce.Left = tools.IntOrDefault(data.Get("left"))
     announce.Ip = data.Get("ip")
+    announce.IpV6 = data.Get("ipv6")
     announce.NumWant = tools.IntOrDefault(data.Get("numwant"))
     announce.Event = data.Get("event")
     announce.Data = data

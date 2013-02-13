@@ -4,10 +4,10 @@ OUTPUT=go-tracker
 build:
 	go build
 
-install: build
+install:
 	mkdir -p $(PREFIX) 
 	mkdir -p $(PREFIX)/config
-	cp -fR config/ $(PREFIX)/config/
+	cp -R config/ $(PREFIX)/config/
 	mkdir -p $(PREFIX)/bin
 	cp -f $(OUTPUT) $(PREFIX)/bin
 
