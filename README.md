@@ -7,6 +7,7 @@ git clone https://github.com/bpina/go-tracker.git
 </pre>
 <p>Edit the value for PREFIX in the makefile to your liking</p>
 <pre>
-make install
+make
+make install clean
 </pre>
 
