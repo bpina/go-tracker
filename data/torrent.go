@@ -4,6 +4,7 @@ import (
     _ "github.com/bmizerany/pq"
     "database/sql"
     "log"
+    "strconv"
 )
 
 type Torrent struct {
@@ -14,9 +15,9 @@ type Torrent struct {
 
 func (t *Torrent) GetFields() map[string] string {
     fields := map[string] string {
-        "info_hash": "\"" + Sanitize(t.InfoHash) + "\"",
-        "complete": string(t.Complete),
-        "incomplete": string(t.Incomplete),
+        "info_hash": "'" + Sanitize(t.InfoHash) + "'",
+        "complete": strconv.Itoa(t.Complete),
+        "incomplete": strconv.Itoa(t.Incomplete),
     }
 
     return fields
@@ -35,14 +36,8 @@ func (t *Torrent) Update() error {
 
 func FindTorrent(infoHash string) (t *Torrent, err error) {
     sanitized_info_hash := Sanitize(infoHash)
-    sql := "SELECT * FROM torrents WHERE info_hash=\"" + sanitized_info_hash + "\""
+    sql := "SELECT * FROM torrents WHERE info_hash='" + sanitized_info_hash + "'"
     log.Printf(sql)
-
-    _, err = Database.Query("SELECT * FROM peers")
-    if err != nil {
-        log.Printf("error from first query")
-        return t, err
-    }
 
     rows, err := Database.Query(sql)
     if err != nil {

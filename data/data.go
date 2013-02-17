@@ -21,9 +21,15 @@ func GetConnectionString(config configuration.DatabaseConfiguration) string {
     }
 
     runes := []rune{}
+    i := 1
+    max := len(properties)
     for key, value := range properties {
-        property := key + "=" + value + " "
+        property := key + "=" + value
+        if i != max {
+            property = property + " "
+        }
         runes = append(runes, []rune(property)...)
+        i += 1
     }
 
     return string(runes)
@@ -31,7 +37,7 @@ func GetConnectionString(config configuration.DatabaseConfiguration) string {
 
 func OpenDatabaseConnection(config configuration.DatabaseConfiguration) error {
     connection := GetConnectionString(config)
-    log.Printf(connection)
+    log.Printf("'%v'", connection)
 
     db, err := sql.Open("postgres", connection)
     if err != nil {
@@ -47,26 +53,29 @@ func CloseDatabaseConnection() {
 }
 
 func InsertRow(table string, fields map[string] string) error {
-    var columns []rune
-    var values []rune
+    var columns string
+    var values string
 
     i := 1
     max := len(fields)
     for key, value := range fields {
 
         column := key + ", "
-        columnValue := "'" + value + "', "
+        columnValue := value + ", "
         if i == max {
             column = key
-            columnValue = "'" + value + "'"
+            columnValue = value
         }
 
-        columns = append(columns, []rune(column)...)
-        values = append(values, []rune(columnValue)...)
+        columns = columns + column
+        values = values + columnValue
         i += 1
     }
 
-    sql := "INSERT INTO " + table + " (" + string(columns) + ") VALUES (" + string(values) + ")"
+    log.Printf("columns: %v", columns)
+    log.Printf("values: %v", values)
+
+    sql := "INSERT INTO " + table + " (" + columns + ") VALUES (" + values + ")"
 
     log.Printf(sql)
 
@@ -105,5 +114,5 @@ func UpdateRow(table string, fields map[string] string, where string) error {
 
 func Sanitize(sql string) string {
     //TODO: figure out what the fuck actually
-    return strings.Replace(sql, "\"", "\\\"", -1)
+    return strings.Replace(sql, "'", "\\'", -1)
 }

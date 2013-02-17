@@ -52,16 +52,62 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
         }
 
         if torrent == nil {
+            newTorrent := new(data.Torrent)
+            newTorrent.InfoHash = announce.InfoHash
+            newTorrent.Complete = 0
+            newTorrent.Incomplete = 0
+
+            err = newTorrent.Save()
+            if err != nil {
+                response := thp.NewErrorResponse(err.Error())
+                w.Write([]byte(response.String()))
+                log.Printf(response.String())
+                return
+            }
+
             response := thp.NewErrorResponse("Could not locate torrent.")
             w.Write([]byte(response.String()))
             log.Printf(response.String())
             return
         }
 
+        peer, err := data.FindPerrByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
+        if err != nil {
+            response := thp.NewErrorResponse("Database error")
+            w.Write([]byte(response.String())
+            log.Printf(response.String())
+        }
+
+        if peer == nil {
+            peer = new(Peer)
+            peer.PeerId = announce.PeerId
+            peer.Ip = announce.Ip
+            peer.Port = announce.Port
+            peer.InfoHash = torrent.InfoHash
+            peer.Save()
+
+            if announce.NumWant == 0 {
+                torrent.Complete += 1
+            } else {
+                torrent.Incomplete += 1
+            }
+            torrent.Update()
+        }
+
+        if announce.IpV6 != "" {
+            peer.Ip = announce.Ip
+            peer.IsIpV6 = false
+            peer.Update()
+        } else {
+            peer.Ip = announce.IpV6
+            peer.IsIpV6 = true
+            peer.Update()
+        }
+
         response := new(thp.Response)
         response.Interval = 30
-        response.Complete = 999
-        response.Incomplete = 999
+        response.Complete = torrent.Complete
+        response.Incomplete = torrent.Incomplete
 
         peer := new(thp.ConnectedPeer)
         peer.Ip = "192.168.3.99"
