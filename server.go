@@ -71,15 +71,15 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
             return
         }
 
-        peer, err := data.FindPerrByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
+        peer, err := data.FindPeerByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
         if err != nil {
             response := thp.NewErrorResponse("Database error")
-            w.Write([]byte(response.String())
+            w.Write([]byte(response.String()))
             log.Printf(response.String())
         }
 
         if peer == nil {
-            peer = new(Peer)
+            peer = new(data.Peer)
             peer.PeerId = announce.PeerId
             peer.Ip = announce.Ip
             peer.Port = announce.Port
@@ -109,12 +109,12 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
         response.Complete = torrent.Complete
         response.Incomplete = torrent.Incomplete
 
-        peer := new(thp.ConnectedPeer)
-        peer.Ip = "192.168.3.99"
-        peer.Port = 1337
-        peer.PeerId = announce.PeerId
+        connectedPeer := new(thp.ConnectedPeer)
+        connectedPeer.Ip = "192.168.3.99"
+        connectedPeer.Port = 1337
+        connectedPeer.PeerId = announce.PeerId
 
-        response.Peers = append(response.Peers, *peer)
+        response.Peers = append(response.Peers, *connectedPeer)
 
         message := response.String()
         log.Printf(message)
