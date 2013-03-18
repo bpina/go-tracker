@@ -1,6 +1,12 @@
 <h1>go-tracker</h1>
 <span>A bittorrent tracker written in Go.</span>
 
+<h2>Requirements</h2>
+<ul>
+  <li>A working Go installation.</li>
+  <li>PostgreSQL</li>
+</ul>
+
 <h2>Installation</h2>
 <pre>
 git clone https://github.com/bpina/go-tracker.git
