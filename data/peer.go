@@ -17,11 +17,10 @@ type Peer struct {
 
 func (p *Peer) GetFields() map[string] string {
     fields := map[string] string {
-        "id": strconv.Itoa(p.Id),
         "peer_id": "'" + p.PeerId + "'",
         "ip": "'" + p.Ip + "'",
         "port": strconv.Itoa(p.Port),
-        "info_hash": p.InfoHash,
+        "info_hash": "'" + p.InfoHash + "'",
     }
 
     if p.IsIpV6 {
@@ -43,8 +42,26 @@ func (p *Peer) Update() error {
     return UpdateRow("peers", fields, "id=" + strconv.Itoa(p.Id))
 }
 
+func FindAvailablePeers(peerId string, infoHash string, isIpV6 bool) (peers []Peer, err error) {
+  var ipV6 string
+  if isIpV6 {
+    ipV6 = "true"
+  } else {
+    ipV6 = "false"
+  }
+
+  sql := "SELECT * FROM peers WHERE peer_id!='" + Sanitize(peerId) + "' AND info_hash='" + Sanitize(infoHash) + "' AND is_ipv6=" + ipV6
+
+  rows, err := Database.Query(sql)
+  if err != nil {
+    return peers, err
+  }
+
+  return GetPeersFromRows(rows)
+}
+
 func FindPeerByPeerIdAndInfoHash(peerId string, infoHash string) (p *Peer, err error) {
-    sql := "SELECT * FROM peers WHERE peerId='" + Sanitize(peerId) + "' AND info_hash='" + Sanitize(infoHash) + "'"
+    sql := "SELECT * FROM peers WHERE peer_id='" + Sanitize(peerId) + "' AND info_hash='" + Sanitize(infoHash) + "'"
 
     rows, err := Database.Query(sql)
     if err != nil {

@@ -94,11 +94,14 @@ func UpdateRow(table string, fields map[string] string, where string) error {
     max := len(fields)
     for key, value := range fields {
         update := key + "=" + value + ", "
+        log.Printf(string(i))
+        log.Printf(string(max))
         if i == max {
             update = key + "=" + value
         }
 
         updates = append(updates, []rune(update)...)
+        i += 1
     }
 
     sql := "UPDATE " + table + " SET " + string(updates) + " WHERE " + where
