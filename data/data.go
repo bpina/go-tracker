@@ -37,7 +37,6 @@ func GetConnectionString(config configuration.DatabaseConfiguration) string {
 
 func OpenDatabaseConnection(config configuration.DatabaseConfiguration) error {
     connection := GetConnectionString(config)
-    log.Printf("'%v'", connection)
 
     db, err := sql.Open("postgres", connection)
     if err != nil {
@@ -72,12 +71,7 @@ func InsertRow(table string, fields map[string] string) error {
         i += 1
     }
 
-    log.Printf("columns: %v", columns)
-    log.Printf("values: %v", values)
-
     sql := "INSERT INTO " + table + " (" + columns + ") VALUES (" + values + ")"
-
-    log.Printf(sql)
 
     _, err := Database.Exec(sql)
     if err != nil {
@@ -105,7 +99,6 @@ func UpdateRow(table string, fields map[string] string, where string) error {
     }
 
     sql := "UPDATE " + table + " SET " + string(updates) + " WHERE " + where
-    log.Printf(sql)
 
     _, err := Database.Exec(sql)
     if err != nil {
@@ -117,5 +110,5 @@ func UpdateRow(table string, fields map[string] string, where string) error {
 
 func Sanitize(sql string) string {
     //TODO: figure out what the fuck actually
-    return strings.Replace(sql, "'", "\\'", -1)
+    return strings.Replace(sql, "'", "''", -1)
 }

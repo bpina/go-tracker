@@ -15,17 +15,14 @@ var DbConfig configuration.DatabaseConfiguration
 func WriteErrorResponse(w http.ResponseWriter, message string) {
   response := thp.NewErrorResponse(message)
   w.Write([]byte(response.String()))
-  log.Printf(response.String())
 }
 
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
-    log.Printf(req.RemoteAddr)
     w.Header().Set("Content-Type", "text/plain")
 
     if req.Method != "GET" {
         response := thp.NewErrorResponse("Unsupported HTTP method.")
         w.Write([]byte(response.String()))
-        log.Printf(response.String())
         return
     }
 
@@ -33,7 +30,6 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
     if err != nil {
         response := thp.NewErrorResponse("No database connection.")
         w.Write([]byte(response.String()))
-        log.Printf(response.String())
         return
     }
     defer data.CloseDatabaseConnection()
@@ -44,14 +40,12 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
         message := tools.FormatErrors(errors)
         response := thp.NewErrorResponse(message)
         w.Write([]byte(response.String()))
-        log.Printf(response.String())
         return
     } else {
-        host, port, err := net.SplitHostPort(req.RemoteAddr)
+        host, _, err := net.SplitHostPort(req.RemoteAddr)
         if err != nil {
           WriteErrorResponse(w, "Could not determine remote host")
         }
-        log.Printf(port)
 
         ip := net.ParseIP(host)
         if ip == nil {
@@ -62,64 +56,39 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
 
         torrent, err := data.FindTorrent(announce.InfoHash)
         if err != nil {
-            log.Printf(err.Error())
             response := thp.NewErrorResponse("Database error.")
             w.Write([]byte(response.String()))
-            log.Printf(response.String())
             return
         }
 
         if torrent == nil {
-            newTorrent := new(data.Torrent)
-            newTorrent.InfoHash = announce.InfoHash
-            newTorrent.Complete = 0
-            newTorrent.Incomplete = 0
-
-            err = newTorrent.Save()
-            if err != nil {
-                response := thp.NewErrorResponse(err.Error())
-                w.Write([]byte(response.String()))
-                log.Printf(response.String())
-                return
-            }
-
             response := thp.NewErrorResponse("Could not locate torrent.")
             w.Write([]byte(response.String()))
-            log.Printf(response.String())
             return
         }
 
         peer, err := data.FindPeerByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
         if err != nil {
-            log.Printf(err.Error())
             response := thp.NewErrorResponse("Database error")
             w.Write([]byte(response.String()))
-            log.Printf(response.String())
             return
         }
 
         if peer == nil {
-            log.Printf("Making a new peer")
             peer = new(data.Peer)
             peer.PeerId = announce.PeerId
             peer.Ip = host
             peer.Port = announce.Port
             peer.InfoHash = torrent.InfoHash
             peer.IsIpV6 = is_ipv6
-            err = peer.Save()
-            if err != nil {
-              log.Printf(err.Error())
-            }
+            peer.Save()
 
             if announce.NumWant == 0 {
                 torrent.Complete += 1
             } else {
                 torrent.Incomplete += 1
             }
-            err = torrent.Update()
-            if err != nil {
-              log.Printf(err.Error())
-            }
+            torrent.Update()
         } else {
           peer.Ip = host
           peer.IsIpV6 = is_ipv6
@@ -133,7 +102,6 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
 
         availablePeers, err := data.FindAvailablePeers(announce.PeerId, torrent.InfoHash, is_ipv6)
         if err != nil {
-          log.Printf(err.Error())
           WriteErrorResponse(w, "Database error")
           return
         }
@@ -147,7 +115,6 @@ func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
         }
 
         message := response.String()
-        log.Printf(message)
         w.Write([]byte(message))
     }
 }
