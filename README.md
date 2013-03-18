@@ -17,3 +17,15 @@ make
 make install clean
 </pre>
 
+<h2>Configuration</h2>
+Add your database information to database.json in PREFIX/config.
+<pre>
+{
+    "database": "database",
+    "host": "localhost",
+    "user": "user",
+    "password": "password",
+    "port": ""
+}
+</pre>
+
