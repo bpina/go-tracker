@@ -34,6 +34,27 @@ func (t *Torrent) Update() error {
     return UpdateRow("torrents", fields, "info_hash='" + Sanitize(t.InfoHash) + "'")
 }
 
+func (t *Torrent) Adjust(numWant int) {
+  if numWant == 0 {
+    t.Complete += 1
+    if t.Incomplete > 0 {
+      t.Incomplete -= 1
+    }
+  } else {
+    t.Incomplete += 1
+    if t.Complete > 0 {
+      t.Complete -= 1
+    }
+  }
+
+  t.Update()
+}
+
+func (t *Torrent) GetPeers(peer *Peer) ([]Peer, error) {
+  peers, err := FindAvailablePeers(peer.PeerId, t.InfoHash, peer.IsIpV6)
+  return peers, err
+}
+
 func FindTorrent(infoHash string) (t *Torrent, err error) {
     sanitized_info_hash := Sanitize(infoHash)
     sql := "SELECT * FROM torrents WHERE info_hash='" + sanitized_info_hash + "'"
