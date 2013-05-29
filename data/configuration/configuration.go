@@ -6,7 +6,6 @@ import (
     "bufio"
     "io"
     "encoding/json"
-    "log"
 )
 
 type DatabaseConfiguration struct {
@@ -23,40 +22,31 @@ func NewDatabaseConfiguration() (config DatabaseConfiguration, err error) {
         return config, err
     }
 
-    log.Printf("found config dir and changed to it")
-
-    configDir, configErr := os.Getwd()
-    if configErr != nil {
-        return config, configErr
+    configDir, err := os.Getwd()
+    if err != nil {
+        return config, err
     }
-
-    log.Printf("got cwd")
 
     filePath := filepath.Join(configDir, "database.json")
-    file, fileErr := os.Open(filePath)
-    defer file.Close()
-    if fileErr != nil {
-        return config, fileErr
+    file, err := os.Open(filePath)
+    if err != nil {
+        return config, err
     }
-
-    log.Printf("opened config file")
+    defer file.Close()
 
     reader := bufio.NewReader(file)
-    var eofErr error
     buffer := []string{}
     for {
-        line, readerErr := reader.ReadString('\n')
-        eofErr = readerErr
-        if readerErr != nil {
-            break
+      line, err := reader.ReadString('\n')
+      if err == io.EOF {
+        break
+      } else {
+        if err != nil {
+          return config, err
         }
+      }
 
-        buffer = append(buffer, line)
-    }
-    if eofErr == io.EOF {
-        eofErr = nil
-    } else {
-        return config, eofErr
+      buffer = append(buffer, line)
     }
 
     var jsonString string
@@ -64,16 +54,10 @@ func NewDatabaseConfiguration() (config DatabaseConfiguration, err error) {
         jsonString += buffer[i]
     }
 
-    log.Printf("read lines into buffer")
-
-    log.Printf(jsonString)
-
-    jsonErr := json.Unmarshal([]byte(jsonString), &config)
-    if jsonErr != nil {
-        return config, jsonErr
+    err = json.Unmarshal([]byte(jsonString), &config)
+    if err != nil {
+        return config, err
     }
-
-    log.Printf("loaded databasconfiguration from json string")
 
     return config, err
 }
