@@ -1,108 +1,113 @@
 package data
 
 import (
-    _ "github.com/bmizerany/pq"
-    "database/sql"
-    "strconv"
+	"github.com/jackc/pgx"
+	"log"
 )
 
 type Peer struct {
-    Id          int
-    PeerId      string
-    Ip          string
-    Port        int
-    InfoHash    string
-    IsIpV6      bool
+	Id       int32
+	PeerId   []byte
+	Ip       string
+	Port     int32
+	InfoHash []byte
+	IsIpV6   bool
 }
 
-func (p *Peer) GetFields() map[string] string {
-    fields := map[string] string {
-        "peer_id": "'" + p.PeerId + "'",
-        "ip": "'" + p.Ip + "'",
-        "port": strconv.Itoa(p.Port),
-        "info_hash": "'" + p.InfoHash + "'",
-    }
+func (p *Peer) Save() (bool, error) {
+	pgx := "INSERT INTO peers (peer_id, ip, port, info_hash, is_ipv6) VALUES ($1, $2, $3, $4, $5) RETURNING id"
 
-    if p.IsIpV6 {
-        fields["is_ipv6"] = "true"
-    } else {
-        fields["is_ipv6"] = "false"
-    }
+	var id int32
+	err := Database.QueryRow(pgx, []byte(p.PeerId), p.Ip, p.Port, p.InfoHash, p.IsIpV6).Scan(&id)
 
-    return fields
+	if err != nil {
+		log.Print(err)
+		return false, err
+	}
+
+	p.Id = id
+
+	return true, err
 }
 
-func (p *Peer) Save() error {
-    fields := p.GetFields()
-    return InsertRow("peers", fields)
+func (p *Peer) Update() (bool, error) {
+	pgx := "UPDATE peers peer_id = $1, ip = $2, port = $3, info_hash = $4, is_ipv6 = $5)"
+
+	commandTag, err := Database.Exec(pgx, []byte(p.PeerId), p.Ip, p.Port, []byte(p.InfoHash), p.IsIpV6)
+
+	if err != nil {
+		return false, err
+	}
+
+	return commandTag.RowsAffected() > 0, err
+
 }
 
-func (p *Peer) Update() error {
-    fields := p.GetFields()
-    return UpdateRow("peers", fields, "id=" + strconv.Itoa(p.Id))
+func FindAvailablePeers(peerId []byte, infoHash []byte, isIpV6 bool) (peers []Peer, err error) {
+	pgx := "SELECT * FROM peers WHERE peer_id != $1 AND info_hash = $2 AND is_ipv6 = $3"
+
+	log.Printf("\nfinding peers:\n peer_id: %x\n info_hash %x\n", peerId, infoHash)
+	log.Printf("\nsql: %s\n", pgx)
+
+	rows, err := Database.Query(pgx, peerId, infoHash, isIpV6)
+	if err != nil {
+		return peers, err
+	}
+
+	peers, err = GetPeersFromRows(rows)
+
+	log.Printf("\npeer length: %i\n", len(peers))
+
+	rows.Close()
+
+	return peers, err
 }
 
-func FindAvailablePeers(peerId string, infoHash string, isIpV6 bool) (peers []Peer, err error) {
-  var ipV6 string
-  if isIpV6 {
-    ipV6 = "true"
-  } else {
-    ipV6 = "false"
-  }
+func FindPeerByPeerIdAndInfoHash(peerId []byte, infoHash []byte) (p *Peer, err error) {
+	pgx := "SELECT * FROM peers WHERE peer_id = $1 AND info_hash = $2"
 
-  sql := "SELECT * FROM peers WHERE peer_id!='" + Sanitize(peerId) + "' AND info_hash='" + Sanitize(infoHash) + "' AND is_ipv6=" + ipV6
+	rows, err := Database.Query(pgx, peerId, infoHash)
+	if err != nil {
+		log.Print(err)
+		return p, err
+	}
 
-  rows, err := Database.Query(sql)
-  if err != nil {
-    return peers, err
-  }
+	peers, err := GetPeersFromRows(rows)
 
-  return GetPeersFromRows(rows)
+	if err != nil || len(peers) == 0 {
+		return p, err
+	}
+
+	return &peers[0], err
 }
 
-func FindPeerByPeerIdAndInfoHash(peerId string, infoHash string) (p *Peer, err error) {
-    sql := "SELECT * FROM peers WHERE peer_id='" + Sanitize(peerId) + "' AND info_hash='" + Sanitize(infoHash) + "'"
+func GetPeersFromRows(rows *pgx.Rows) (peers []Peer, err error) {
+	for rows.Next() {
+		var (
+			id       int32
+			peerId   []byte
+			ip       string
+			port     int32
+			infoHash []byte
+			isIpV6   bool
+		)
 
-    rows, err := Database.Query(sql)
-    if err != nil {
-        return p, err
-    }
+		err = rows.Scan(&id, &peerId, &ip, &port, &infoHash, &isIpV6)
+		if err != nil {
+			log.Print(err)
+			return peers, err
+		}
 
-    peers, err := GetPeersFromRows(rows)
+		peer := new(Peer)
+		peer.Id = id
+		peer.PeerId = peerId
+		peer.Ip = ip
+		peer.Port = port
+		peer.InfoHash = infoHash
+		peer.IsIpV6 = isIpV6
 
-    if err != nil || len(peers) == 0 {
-        return p, err
-    }
+		peers = append(peers, *peer)
+	}
 
-    return &peers[0], err
-}
-
-func GetPeersFromRows(rows *sql.Rows) (peers []Peer, err error) {
-    for rows.Next() {
-        var (
-            id          int
-            peerId      string
-            ip          string
-            port        int
-            infoHash    string
-            isIpV6      bool
-        )
-
-        err = rows.Scan(&id, &peerId, &ip, &port, &infoHash, &isIpV6)
-        if err != nil {
-            return peers, err
-        }
-
-        peer := new(Peer)
-        peer.Id = id
-        peer.PeerId = peerId
-        peer.Ip = ip
-        peer.Port = port
-        peer.InfoHash = infoHash
-        peer.IsIpV6 = isIpV6
-
-        peers = append(peers, *peer)
-    }
-
-    return peers, err
+	return peers, err
 }

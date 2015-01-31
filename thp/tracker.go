@@ -1,131 +1,139 @@
 package thp
 
 import (
-    "net"
-    "net/http"
-    "github.com/bpina/go-tracker/data/configuration"
-    "github.com/bpina/go-tracker/data"
-    "github.com/bpina/go-tracker/tools"
+	"github.com/bpina/go-tracker/data"
+	"github.com/bpina/go-tracker/tools"
+	"log"
+	"net"
+	"net/http"
 )
 
 type Tracker struct {
-    RemoteHost  string
-    IsIpV6      bool
-    Request     *http.Request
-    DbConfig    configuration.DatabaseConfiguration
+	RemoteHost string
+	IsIpV6     bool
+	Request    *http.Request
 }
 
-func NewTracker(dbConfig configuration.DatabaseConfiguration, req *http.Request) (t *Tracker, err error) {
-    err = ValidateTrackerRequest(req)
-    if err != nil {
-      return t, err
-    }
+func NewTracker(req *http.Request) (t *Tracker, err error) {
+	err = ValidateTrackerRequest(req)
+	if err != nil {
+		return t, err
+	}
 
-    ip, err := ParseRemoteAddress(req.RemoteAddr)
-    if err != nil {
-      return t, err
-    }
+	ip, err := ParseRemoteAddress(req.RemoteAddr)
+	if err != nil {
+		return t, err
+	}
 
-    t = new(Tracker)
-    t.RemoteHost = string(ip)
-    t.IsIpV6 = ip.To4() == nil
-    t.Request = req
-    t.DbConfig = dbConfig
+	log.Printf("parse IP: %s", string(ip))
 
-    return t, err
+	t = new(Tracker)
+	t.RemoteHost = ip.String()
+	t.IsIpV6 = ip.To4() == nil
+	t.Request = req
+
+	return t, err
 }
 
 func (t *Tracker) Execute() *Response {
-  announce, errors := NewAnnounce(t.Request)
-  if errors != nil {
-    message := tools.FormatErrors(errors)
-    return NewErrorResponse(message)
-  }
+	announce, announceErr := NewAnnounce(t.Request)
+	if announceErr != nil {
+		message := tools.FormatErrors(announceErr)
+		return NewErrorResponse(message)
+	}
 
-  err := data.OpenDatabaseConnection(t.DbConfig)
-  if err != nil {
-      return NewDatabaseErrorResponse()
-  }
-  defer data.CloseDatabaseConnection()
+	torrent, err := data.FindTorrent(announce.InfoHash)
+	if err != nil {
+		log.Print(err)
+		return NewDatabaseErrorResponse()
+	}
 
-  torrent, err := data.FindTorrent(announce.InfoHash)
-  if err != nil {
-      return NewDatabaseErrorResponse()
-  }
+	if torrent == nil {
+		torrent = &data.Torrent{announce.InfoHash, 0, 0}
+		_, err := torrent.Save()
+		if err != nil {
+			log.Print(err)
+			return NewErrorResponse("Could not find or create locate torrent.")
+		}
+	}
 
-  if torrent == nil {
-      return NewErrorResponse("Could not locate torrent.")
-  }
+	torrent.Adjust(announce.NumWant)
+	_, err = torrent.Update()
+	if err != nil {
+		log.Print(err)
+		return NewDatabaseErrorResponse()
+	}
 
-  torrent.Adjust(announce.NumWant)
+	peer, err := data.FindPeerByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
+	if err != nil {
+		log.Print(err)
+		return NewDatabaseErrorResponse()
+	}
 
-  peer, err := data.FindPeerByPeerIdAndInfoHash(announce.PeerId, torrent.InfoHash)
-  if err != nil {
-      return NewDatabaseErrorResponse()
-  }
+	if peer == nil {
+		peer = t.CreatePeer(announce)
+	} else {
+		t.UpdatePeer(peer, announce)
+	}
 
-  if peer == nil {
-    peer = t.CreatePeer(announce)
-  } else {
-    t.UpdatePeer(peer, announce)
-  }
+	peers, err := torrent.GetPeers(peer)
+	if err != nil {
+		log.Print(err)
+		return NewDatabaseErrorResponse()
+	}
 
-  peers, err := torrent.GetPeers(peer)
-  if err != nil {
-    return NewDatabaseErrorResponse()
-  }
-
-  return NewTorrentResponse(torrent, peers)
+	return NewTorrentResponse(torrent, peers)
 }
 
 func (t *Tracker) CreatePeer(announce *Announce) *data.Peer {
-  peer := new(data.Peer)
-  peer.PeerId = announce.PeerId
-  peer.Ip = t.RemoteHost
-  peer.Port = announce.Port
-  peer.InfoHash = announce.InfoHash
-  peer.IsIpV6 = t.IsIpV6
-  peer.Save()
+	log.Print("assigning IP to peer: %s", t.RemoteHost)
+	peer := new(data.Peer)
+	peer.PeerId = []byte(announce.PeerId)
+	peer.Ip = t.RemoteHost
+	peer.Port = int32(announce.Port)
+	peer.InfoHash = []byte(announce.InfoHash)
+	peer.IsIpV6 = t.IsIpV6
+	peer.Save()
 
-  return peer
+	return peer
 }
 
 func (t *Tracker) UpdatePeer(peer *data.Peer, announce *Announce) {
-  peer.Port = announce.Port
-  peer.Ip = t.RemoteHost
-  peer.IsIpV6 = t.IsIpV6
-  peer.Update()
+	peer.Port = int32(announce.Port)
+	peer.Ip = t.RemoteHost
+	peer.IsIpV6 = t.IsIpV6
+	peer.Update()
 }
 
 func ValidateTrackerRequest(req *http.Request) error {
-  if req.Method != "GET" {
-    return &TrackerError{"Unsupported HTTP method"}
-  }
+	if req.Method != "GET" {
+		return &TrackerError{"Unsupported HTTP method"}
+	}
 
-  if req.RemoteAddr == "" {
-    return &TrackerError{"Unable to identify remote address"}
-  }
+	if req.RemoteAddr == "" {
+		return &TrackerError{"Unable to identify remote address"}
+	}
 
-  return nil
+	return nil
 }
 
 func ParseRemoteAddress(remoteAddress string) (ip net.IP, err error) {
-  host, _, err := net.SplitHostPort(remoteAddress)
-  if err != nil {
-    return ip, err
-  }
+	host, _, err := net.SplitHostPort(remoteAddress)
+	if err != nil {
+		return ip, err
+	}
 
-  ip = net.ParseIP(host)
-  if ip == nil {
-    err = &TrackerError{"Could not parse remote address"}
-  }
-  return ip, err
+	ip = net.ParseIP(host)
+	if ip == nil {
+		err = &TrackerError{"Could not parse remote address"}
+	}
+	return ip, err
 }
 
 type TrackerError struct {
-  Message string
+	Message string
 }
 
 func (e *TrackerError) Error() string {
-  return e.Message
+	return e.Message
 }

@@ -1,114 +1,81 @@
 package data
 
 import (
-    _ "github.com/bmizerany/pq"
-    "database/sql"
-    "github.com/bpina/go-tracker/data/configuration"
-    "strings"
-    "log"
+	"fmt"
+	"github.com/bpina/go-tracker/data/configuration"
+	"github.com/jackc/pgx"
 )
 
-var Database *sql.DB
+var Database *pgx.ConnPool
 
 func GetConnectionString(config configuration.DatabaseConfiguration) string {
-    //TODO: figure out how to handle port configuration and sslmode
-    properties := map[string] string {
-        "dbname": config.Database,
-        "host": config.Host,
-        "user": config.User,
-        "password": config.Password,
-        "sslmode": "disable",
-    }
+	var sslMode string
+	if config.SSLMode != "" {
+		sslMode = config.SSLMode
+	} else {
+		sslMode = "disabled"
+	}
 
-    runes := []rune{}
-    i := 1
-    max := len(properties)
-    for key, value := range properties {
-        property := key + "=" + value
-        if i != max {
-            property = property + " "
-        }
-        runes = append(runes, []rune(property)...)
-        i += 1
-    }
+	var port string
+	if config.Port != "" {
+		port = config.Port
+	} else {
+		port = "5432"
+	}
 
-    return string(runes)
+	properties := map[string]string{
+		"dbname":   config.Database,
+		"host":     config.Host,
+		"user":     config.User,
+		"password": config.Password,
+		"port":     port,
+		"sslmode":  sslMode,
+	}
+
+	runes := []rune{}
+	i := 1
+	max := len(properties)
+	for key, value := range properties {
+		property := key + "=" + value
+		if i != max {
+			property = property + " "
+		}
+		runes = append(runes, []rune(property)...)
+		i += 1
+	}
+
+	return string(runes)
 }
 
-func OpenDatabaseConnection(config configuration.DatabaseConfiguration) error {
-    connection := GetConnectionString(config)
+func OpenDatabaseConnection(config configuration.DatabaseConfiguration) (pool *pgx.ConnPool, err error) {
+	connectionUri := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		config.User,
+		config.Password,
+		config.Host,
+		config.Port,
+		config.Database,
+		config.SSLMode)
 
-    db, err := sql.Open("postgres", connection)
-    if err != nil {
-        return err
-    }
+	connectionConfig, err := pgx.ParseURI(connectionUri)
 
-    Database = db
-    return err
+	if err != nil {
+		return pool, err
+	}
+
+	maxConnections := 50
+
+	poolConfig := pgx.ConnPoolConfig{connectionConfig, maxConnections, nil}
+
+	pool, err = pgx.NewConnPool(poolConfig)
+
+	if err != nil {
+		return pool, err
+	}
+
+	Database = pool
+	return pool, err
 }
 
 func CloseDatabaseConnection() {
-    Database.Close()
-}
-
-func InsertRow(table string, fields map[string] string) error {
-    var columns string
-    var values string
-
-    i := 1
-    max := len(fields)
-    for key, value := range fields {
-
-        column := key + ", "
-        columnValue := value + ", "
-        if i == max {
-            column = key
-            columnValue = value
-        }
-
-        columns = columns + column
-        values = values + columnValue
-        i += 1
-    }
-
-    sql := "INSERT INTO " + table + " (" + columns + ") VALUES (" + values + ")"
-
-    _, err := Database.Exec(sql)
-    if err != nil {
-        return err
-    }
-
-    return nil
-}
-
-func UpdateRow(table string, fields map[string] string, where string) error {
-    var updates []rune
-
-    i := 1
-    max := len(fields)
-    for key, value := range fields {
-        update := key + "=" + value + ", "
-        log.Printf(string(i))
-        log.Printf(string(max))
-        if i == max {
-            update = key + "=" + value
-        }
-
-        updates = append(updates, []rune(update)...)
-        i += 1
-    }
-
-    sql := "UPDATE " + table + " SET " + string(updates) + " WHERE " + where
-
-    _, err := Database.Exec(sql)
-    if err != nil {
-        return err
-    }
-
-    return nil
-}
-
-func Sanitize(sql string) string {
-    //TODO: figure out what the fuck actually
-    return strings.Replace(sql, "'", "''", -1)
+	Database.Close()
 }

@@ -1,99 +1,94 @@
 package data
 
 import (
-    _ "github.com/bmizerany/pq"
-    "database/sql"
-    "log"
-    "strconv"
+	"github.com/jackc/pgx"
 )
 
 type Torrent struct {
-    InfoHash        string
-    Incomplete      int
-    Complete        int
+	InfoHash   []byte
+	Incomplete int32
+	Complete   int32
 }
 
-func (t *Torrent) GetFields() map[string] string {
-    fields := map[string] string {
-        "info_hash": "'" + Sanitize(t.InfoHash) + "'",
-        "complete": strconv.Itoa(t.Complete),
-        "incomplete": strconv.Itoa(t.Incomplete),
-    }
+func (t *Torrent) Save() (bool, error) {
+	pgx := "INSERT INTO torrents (info_hash, complete, incomplete) VALUES ($1, $2, $3)"
 
-    return fields
+	commandTag, err := Database.Exec(pgx, []byte(t.InfoHash), t.Complete, t.Incomplete)
+	if err != nil {
+		return false, err
+	}
+
+	return commandTag.RowsAffected() > 0, err
 }
 
-func (t *Torrent) Save() error {
-    //TODO: implement a one stop save/update
-    fields := t.GetFields()
-    return InsertRow("torrents", fields)
-}
+func (t *Torrent) Update() (bool, error) {
+	pgx := "UPDATE torrents set complete = $1, incomplete = $2 WHERE info_hash = $3"
+	commandTag, err := Database.Exec(pgx, t.Complete, t.Incomplete, []byte(t.InfoHash))
+	if err != nil {
+		return false, err
+	}
 
-func (t *Torrent) Update() error {
-    fields := t.GetFields()
-    return UpdateRow("torrents", fields, "info_hash='" + Sanitize(t.InfoHash) + "'")
+	return commandTag.RowsAffected() > 0, err
 }
 
 func (t *Torrent) Adjust(numWant int) {
-  if numWant == 0 {
-    t.Complete += 1
-    if t.Incomplete > 0 {
-      t.Incomplete -= 1
-    }
-  } else {
-    t.Incomplete += 1
-    if t.Complete > 0 {
-      t.Complete -= 1
-    }
-  }
-
-  t.Update()
+	if numWant == 0 {
+		t.Complete += 1
+		if t.Incomplete > 0 {
+			t.Incomplete -= 1
+		}
+	} else {
+		t.Incomplete += 1
+		if t.Complete > 0 {
+			t.Complete -= 1
+		}
+	}
 }
 
 func (t *Torrent) GetPeers(peer *Peer) ([]Peer, error) {
-  peers, err := FindAvailablePeers(peer.PeerId, t.InfoHash, peer.IsIpV6)
-  return peers, err
+	peers, err := FindAvailablePeers(peer.PeerId, t.InfoHash, peer.IsIpV6)
+	return peers, err
 }
 
-func FindTorrent(infoHash string) (t *Torrent, err error) {
-    sanitized_info_hash := Sanitize(infoHash)
-    sql := "SELECT * FROM torrents WHERE info_hash='" + sanitized_info_hash + "'"
-    log.Printf(sql)
+func FindTorrent(infoHash []byte) (t *Torrent, err error) {
+	pgx := "SELECT * FROM torrents WHERE info_hash = $1"
 
-    rows, err := Database.Query(sql)
-    if err != nil {
-        return t, err
-    }
+	rows, err := Database.Query(pgx, infoHash)
+	if err != nil {
+		return t, err
+	}
 
-    torrents, err := GetTorrentsFromRows(rows)
-    if err != nil || len(torrents) == 0 {
-        return t, err
-    }
+	torrents, err := GetTorrentsFromRows(rows)
+	if err != nil || len(torrents) == 0 {
+		return t, err
+	}
 
-    return &torrents[0], err
+	rows.Close()
+
+	return &torrents[0], err
 }
 
-func GetTorrentsFromRows(rows *sql.Rows) (torrents []Torrent, err error) {
-    for rows.Next() {
-        var (
-            info_hash string
-            incomplete int
-            complete int
-        )
+func GetTorrentsFromRows(rows *pgx.Rows) (torrents []Torrent, err error) {
+	for rows.Next() {
+		var (
+			info_hash  []byte
+			complete   int32
+			incomplete int32
+		)
 
-        err = rows.Scan(&info_hash, &incomplete, &complete)
+		err = rows.Scan(&info_hash, &incomplete, &complete)
 
-        if err != nil {
-            return torrents, err
-        }
+		if err != nil {
+			return torrents, err
+		}
 
-        torrent := new(Torrent)
-        torrent.InfoHash = info_hash
-        torrent.Complete = complete
-        torrent.Incomplete = incomplete
+		torrent := new(Torrent)
+		torrent.InfoHash = info_hash
+		torrent.Complete = complete
+		torrent.Incomplete = incomplete
 
-        torrents = append(torrents, *torrent)
-    }
+		torrents = append(torrents, *torrent)
+	}
 
-    return torrents, err
+	return torrents, err
 }

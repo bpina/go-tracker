@@ -1,36 +1,38 @@
 package main
 
 import (
-    "net/http"
-    "log"
-    "github.com/bpina/go-tracker/thp"
-    "github.com/bpina/go-tracker/data/configuration"
+	"github.com/bpina/go-tracker/data"
+	"github.com/bpina/go-tracker/data/configuration"
+	"github.com/bpina/go-tracker/thp"
+	"log"
+	"net/http"
 )
 
-var DbConfig configuration.DatabaseConfiguration
-
 func AnnounceHandler(w http.ResponseWriter, req *http.Request) {
-    w.Header().Set("Content-Type", "text/plain")
-    var response *thp.Response
+	w.Header().Set("Content-Type", "text/plain")
+	var response *thp.Response
 
-    tracker, err := thp.NewTracker(DbConfig, req)
-    if err != nil {
-      response = thp.NewErrorResponse("Failed to initialize tracker.")
-    } else {
-      response = tracker.Execute()
-    }
+	tracker, err := thp.NewTracker(req)
+	if err != nil {
+		response = thp.NewErrorResponse("Failed to initialize tracker.")
+	} else {
+		response = tracker.Execute()
+	}
 
-    w.Write([]byte(response.String()))
+	w.Write([]byte(response.String()))
 }
 
 func main() {
-    var err error
-    DbConfig, err = configuration.NewDatabaseConfiguration()
+	dbConfig, err := configuration.NewDatabaseConfiguration()
+	if err != nil {
+		panic(err)
+	}
 
-    if err != nil {
-        panic(err)
-    }
+	data.Database, err = data.OpenDatabaseConnection(dbConfig)
+	if err != nil {
+		panic(err)
+	}
 
-    http.HandleFunc("/announce", AnnounceHandler)
-    log.Fatal(http.ListenAndServe(":8080", nil))
+	http.HandleFunc("/announce", AnnounceHandler)
+	log.Fatal(http.ListenAndServe(":9000", nil))
 }

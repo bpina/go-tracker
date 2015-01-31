@@ -3,5 +3,6 @@
     "host": "localhost",
     "user": "user",
     "password": "password",
-    "port": ""
+    "port": "5432",
+    "ssl_mode": "disabled"
 }
